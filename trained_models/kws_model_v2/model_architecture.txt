@@ -1,0 +1,161 @@
+================================================================================
+KWS DS-TCN 模型完整结构
+================================================================================
+模型名称: KWSModel (Depthwise Separable Temporal Convolutional Network)
+框架: wekws
+输入: 40维 FBank 特征
+输出: 2类关键词概率 (Hi_Xiaowen=0, Nihao_Wenwen=1)
+
+================================================================================
+模型架构
+================================================================================
+
+KWSModel(
+  (global_cmvn): GlobalCMVN()
+    - 全局倒谱均值方差归一化
+    - 用于特征标准化
+  
+  (preprocessing): LinearSubsampling1(
+    (out): Sequential(
+      (0): Linear(in_features=40, out_features=256, bias=True)
+      (1): ReLU()
+    )
+    (quant): QuantStub()
+    (dequant): DeQuantStub()
+  )
+    - 输入层：40维 → 256维
+    - 参数量: 10,496
+  
+  (backbone): TCN(
+    (network): ModuleList(
+      (0-3): 4 × DsCnnBlock(
+        (quant): QuantStub()
+        (dequant): DeQuantStub()
+        (cnn): Sequential(
+          (0): Conv1d(256, 256, kernel_size=(8,), dilation=(1/2/4/8), groups=256)
+              - Depthwise 卷积（参数共享）
+              - 膨胀率逐层递增: [1, 2, 4, 8]
+          (1): BatchNorm1d(256, eps=1e-05, momentum=0.1)
+          (2): ReLU()
+          (3): Conv1d(256, 256, kernel_size=(1,), stride=(1,))
+              - Pointwise 卷积（通道混合）
+          (4): BatchNorm1d(256, eps=1e-05, momentum=0.1)
+          (5): ReLU()
+          (6): Dropout(p=0.1, inplace=False)
+        )
+      )
+    )
+  )
+    - 4层 DS-TCN Block
+    - 每层参数量: 68,096
+    - Backbone 总参数量: 272,384
+  
+  (classifier): LinearClassifier(
+    (linear): Linear(in_features=256, out_features=2, bias=True)
+    (quant): QuantStub()
+    (dequant): DeQuantStub()
+  )
+    - 分类层：256维 → 2类
+    - 参数量: 514
+  
+  (activation): Sigmoid()
+    - 输出激活函数
+)
+
+================================================================================
+参数统计
+================================================================================
+总参数量:        287,490
+可训练参数:      287,490
+模型大小:        ~1.1 MB (FP32)
+
+各模块参数分布:
+  - 输入层 (preprocessing):      10,496 (3.6%)
+  - 骨干网络 (backbone):        272,384 (94.7%)
+  - 分类器 (classifier):             514 (0.2%)
+  - BatchNorm running stats:      4,096 (1.4%)
+
+================================================================================
+各层参数详情
+================================================================================
+
+输入层:
+  preprocessing.out.0.weight                    (256, 40)           10,240 params
+  preprocessing.out.0.bias                      (256,)                 256 params
+
+Backbone - Block 0 (dilation=1):
+  backbone.network.0.cnn.0.weight               (256, 1, 8)          2,048 params
+  backbone.network.0.cnn.0.bias                 (256,)                 256 params
+  backbone.network.0.cnn.1.weight               (256,)                 256 params
+  backbone.network.0.cnn.1.bias                 (256,)                 256 params
+  backbone.network.0.cnn.3.weight               (256, 256, 1)       65,536 params
+  backbone.network.0.cnn.3.bias                 (256,)                 256 params
+  backbone.network.0.cnn.4.weight               (256,)                 256 params
+  backbone.network.0.cnn.4.bias                 (256,)                 256 params
+
+Backbone - Block 1 (dilation=2):
+  backbone.network.1.cnn.0.weight               (256, 1, 8)          2,048 params
+  backbone.network.1.cnn.0.bias                 (256,)                 256 params
+  backbone.network.1.cnn.1.weight               (256,)                 256 params
+  backbone.network.1.cnn.1.bias                 (256,)                 256 params
+  backbone.network.1.cnn.3.weight               (256, 256, 1)       65,536 params
+  backbone.network.1.cnn.3.bias                 (256,)                 256 params
+  backbone.network.1.cnn.4.weight               (256,)                 256 params
+  backbone.network.1.cnn.4.bias                 (256,)                 256 params
+
+Backbone - Block 2 (dilation=4):
+  backbone.network.2.cnn.0.weight               (256, 1, 8)          2,048 params
+  backbone.network.2.cnn.0.bias                 (256,)                 256 params
+  backbone.network.2.cnn.1.weight               (256,)                 256 params
+  backbone.network.2.cnn.1.bias                 (256,)                 256 params
+  backbone.network.2.cnn.3.weight               (256, 256, 1)       65,536 params
+  backbone.network.2.cnn.3.bias                 (256,)                 256 params
+  backbone.network.2.cnn.4.weight               (256,)                 256 params
+  backbone.network.2.cnn.4.bias                 (256,)                 256 params
+
+Backbone - Block 3 (dilation=8):
+  backbone.network.3.cnn.0.weight               (256, 1, 8)          2,048 params
+  backbone.network.3.cnn.0.bias                 (256,)                 256 params
+  backbone.network.3.cnn.1.weight               (256,)                 256 params
+  backbone.network.3.cnn.1.bias                 (256,)                 256 params
+  backbone.network.3.cnn.3.weight               (256, 256, 1)       65,536 params
+  backbone.network.3.cnn.3.bias                 (256,)                 256 params
+  backbone.network.3.cnn.4.weight               (256,)                 256 params
+  backbone.network.3.cnn.4.bias                 (256,)                 256 params
+
+分类器:
+  classifier.linear.weight                      (2, 256)               512 params
+  classifier.linear.bias                        (2,)                     2 params
+
+================================================================================
+模型特点
+================================================================================
+
+1. **Depthwise Separable Convolution (DS-Conv)**
+   - 将标准卷积分解为 Depthwise + Pointwise
+   - 大幅减少参数量和计算量
+   - 适合移动端部署
+
+2. **Temporal Convolutional Network (TCN)**
+   - 4层堆叠，膨胀率递增 [1, 2, 4, 8]
+   - 有效感受野: 1 + 8*(1+2+4+8) = 121 帧 = 1.21秒
+   - 适合捕获时序依赖
+
+3. **量化支持 (QuantStub/DeQuantStub)**
+   - 预留 INT8 量化接口
+   - 可进一步压缩模型至 ~300KB
+
+4. **轻量化设计**
+   - 总参数量: 287K (< 0.3M)
+   - FP32 模型大小: ~1.1MB
+   - 适合实时关键词检测
+
+================================================================================
+训练信息
+================================================================================
+预训练模型: kws_wenwen_dstcn (ModelScope)
+微调数据: 嗨小问(39) + 你好问问(56) + 负样本(425)
+微调轮次: 30 epochs
+学习率: 1e-4 → 6.25e-6 (指数衰减)
+验证集准确率: 98.4%
+最佳 cv_loss: 0.00379 (Epoch 28)
