@@ -1,101 +1,33 @@
-# Copyright (c) 2021 Wenet Community. (authors: Binbin Zhang)
-#               2023 Wenet Community. (authors: Dinghao Zhou)
-#               2025 Wenet Community. (authors: Menglong Xu)
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# 替换版 init_dataset.py
+# 使用 wekws 自己的 dataset（不依赖 wenet），兼容 PyTorch 1.13
+# 原始版本依赖新版 wenet 的 Dataset/CharTokenizer，与旧版 PyTorch 不兼容
 
-import copy
-import torch
-
-from functools import partial
-from wenet.dataset.dataset import Dataset
+from wekws.dataset.dataset import Dataset
 
 
-def context_expansion(sample, left=1, right=1):
-    """ expand left and right frames
-        Args:
-            sample: {key, feats, feats_lengths, ...}
-            left (int): feature left context frames
-            right (int): feature right context frames
-
-        Returns:
-            sample: {key, feats, feats_lengths, ...}
+def init_dataset(data_list_file, conf, data_type='raw', partition=True):
     """
-    feats = sample['feats']  # (B, T, D)
-    batch_size = feats.shape[0]
-    ctx_frm = feats.shape[1]
-    ctx_dim = feats.shape[2] * (left + right + 1)
-    feats_ctx = torch.zeros(batch_size, ctx_frm, ctx_dim, dtype=torch.float32)
-    index = 0
-    for lag in range(-left, right + 1):
-        feats_ctx[:, :, index:index + feats.shape[2]] = torch.roll(
-            feats, -lag, 1)
-        index = index + feats.shape[2]
-    # replication pad left margin
-    for idx in range(left):
-        for cpx in range(left - idx):
-            feats_ctx[:, idx, cpx * feats.shape[2]:(cpx + 1) * feats.shape[2]] = \
-                feats_ctx[:, left, :feats.shape[2]]
+    初始化数据集（使用 wekws 自带 dataset，不依赖 wenet）
 
-    feats_ctx = feats_ctx[:, :feats_ctx.shape[1] - right]
-    sample['feats'] = feats_ctx  # (B, T, D * n) where n = left + right + 1
-    sample['feats_lengths'] = sample['feats_lengths'] - right
-    return sample
+    Args:
+        data_list_file: data.list 文件路径
+        conf: dataset_conf 配置字典
+        data_type: 'raw' 或 'shard'（目前只支持 raw），默认 'raw'
+        partition: 是否按 rank 分片（分布式训练时使用）
 
-def frame_skip(sample, skip_rate=1):
-    """ skip frame
-        Args:
-            sample: {key, feats, feats_lengths, ...}
-            skip_rate (int): take every N-frames for model input
-
-        Returns:
-            sample: {key, feats, feats_lengths, ...}
+    Returns:
+        Dataset 对象
     """
-    feats_skip = sample['feats'][:, ::skip_rate, :]
-    sample['feats'] = feats_skip
-    feats_lengths = torch.ceil(sample['feats_lengths'] / skip_rate)
-    sample['feats_lengths'] = feats_lengths.to(dtype=torch.int16)
-    return sample
+    if data_type == 'shard':
+        raise NotImplementedError("shard 格式暂不支持，请使用 raw 格式 (data.list)")
 
-def init_dataset(dataset_type: str = 'asr',
-                 data_type: str = 'raw',
-                 data_list_file=None,
-                 tokenizer=None,
-                 conf=None,
-                 partition=True,
-                 split='train'):
-    assert dataset_type in ['asr']
-    assert data_list_file is not None
-    assert conf is not None
+    # 处理 cv（验证集）配置：关闭 shuffle 和 spec_aug
+    if not partition:
+        import copy
+        conf = copy.deepcopy(conf)
+        conf['shuffle'] = False
+        conf['spec_aug'] = False
+        conf['speed_perturb'] = False
 
-    if split != 'train':
-        cv_conf = copy.deepcopy(conf)
-        cv_conf['cycle'] = 1
-        cv_conf['speed_perturb'] = False
-        cv_conf['spec_aug'] = False
-        cv_conf['spec_sub'] = False
-        cv_conf['spec_trim'] = False
-        cv_conf['shuffle'] = False
-        cv_conf['list_shuffle'] = False
-        conf = cv_conf
-
-    dataset = Dataset(data_type, data_list_file, tokenizer, conf, partition)
-
-    if conf.get('context_expansion', False):
-        dataset = dataset.map(
-            partial(context_expansion, **conf.get('context_expansion_conf', {})))
-
-    if conf.get('frame_skip', 1) > 1:
-        dataset = dataset.map(partial(frame_skip, skip_rate=conf.get('frame_skip')))
-
+    dataset = Dataset(data_list_file, conf)
     return dataset

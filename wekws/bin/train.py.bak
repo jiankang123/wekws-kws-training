@@ -31,7 +31,7 @@ from wekws.utils.checkpoint import load_checkpoint, save_checkpoint
 from wekws.model.kws_model import init_model
 from wekws.utils.executor import Executor
 from wekws.utils.train_utils import count_parameters, set_mannul_seed
-# CharTokenizer removed - using wekws native dataset
+from wenet.text.char_tokenizer import CharTokenizer
 
 
 def get_args():
@@ -110,11 +110,15 @@ def main():
     cv_conf['spec_aug'] = False
     cv_conf['shuffle'] = False
 
-    # tokenizer removed - wekws native dataset does not need it
+    tokenizer = CharTokenizer(f'{args.dict}/dict.txt',
+                              f'{args.dict}/words.txt',
+                              unk='<filler>',
+                              split_with_space=True)
     train_dataset = init_dataset(data_list_file=args.train_data,
-                                 conf=train_conf)
+                                 conf=train_conf,
+                                 tokenizer=tokenizer)
     cv_dataset = init_dataset(data_list_file=args.cv_data, conf=cv_conf,
-                              partition=False)
+                              tokenizer=tokenizer, split='dev')
 
     train_data_loader = DataLoader(train_dataset,
                                    batch_size=None,
@@ -128,11 +132,8 @@ def main():
                                 prefetch_factor=args.prefetch)
 
     feats_type = train_conf.get('feats_type', 'fbank')
-    # 兼容两种 key 格式：fbank_conf (旧格式) 和 feature_extraction_conf (新格式)
-    feats_conf_key = f'{feats_type}_conf'
-    if feats_conf_key not in train_conf and 'feature_extraction_conf' in train_conf:
-        feats_conf_key = 'feature_extraction_conf'
-    input_dim = train_conf[feats_conf_key]['num_mel_bins']
+    input_dim = train_conf[f'{feats_type}_conf'][
+        'num_mel_bins']
     output_dim = args.num_keywords
 
     # Write model_dir/config.yaml for inference and export

@@ -1,0 +1,51 @@
+# 微调配置：基于预训练 DS_TCN，小学习率，少 epoch
+dataset_conf:
+  batch_conf:
+    batch_size: 32          # 数据量少，batch 小一点
+  feature_extraction_conf:
+    dither: 0.1             # 微调时减小 dither，稳定训练
+    feature_type: fbank
+    frame_length: 25
+    frame_shift: 10
+    num_mel_bins: 40
+  filter_conf:
+    max_length: 2048
+    min_length: 0
+  resample_conf:
+    resample_rate: 16000
+  shuffle: true
+  shuffle_conf:
+    shuffle_size: 500
+  spec_aug: true
+  spec_aug_conf:
+    max_f: 10
+    max_t: 20
+    num_f_mask: 1
+    num_t_mask: 1
+  speed_perturb: false
+
+model:
+  backbone:
+    dropout: 0.1
+    ds: true
+    kernel_size: 8
+    num_layers: 4
+    type: tcn
+  cmvn:
+    cmvn_file: exp/finetune_ds_tcn/global_cmvn   # 运行时会被 sed 替换为绝对路径
+    norm_var: true
+  hidden_dim: 256
+  input_dim: 40
+  output_dim: 2
+  preprocessing:
+    type: linear
+
+optim: adam
+optim_conf:
+  lr: 0.0001              # 微调：学习率降为预训练的 1/10
+  weight_decay: 0.0001
+
+training_config:
+  grad_clip: 5
+  log_interval: 5
+  max_epoch: 30           # 微调：只需要少量 epoch

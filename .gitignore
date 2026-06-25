@@ -1,39 +1,56 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Visual Studio Code files
-.vscode
-.vs
+# PyTorch
+*.pth
+*.pt
+*.onnx
 
-# PyCharm files
-.idea
+# 训练产物和实验目录
+exp/
+tensorboard/
+*.log
+nohup.out
 
-# Eclipse Project settings
-*.*project
-.settings
+# 数据和模型（太大）
+examples/*/s0/data/download/
+examples/*/s0/data/local/
+examples/*/s0/exp/*/[0-9]*.pt
+examples/*/s0/exp/*/[0-9]*.yaml
 
-# Sublime Text settings
-*.sublime-workspace
-*.sublime-project
+# 保留重要的配置和脚本
+!examples/*/s0/exp/*/config.yaml
+!examples/*/s0/exp/*/words.txt
+!examples/*/s0/exp/*/global_cmvn
+!examples/*/s0/local/*.py
+!examples/*/s0/*.py
 
-# Editor temporaries
-*.swn
-*.swo
+# IDE
+.vscode/
+.idea/
 *.swp
-*.swm
+*.swo
 *~
 
-# IPython notebook checkpoints
-.ipynb_checkpoints
-
-# macOS dir files
+# OS
 .DS_Store
-
-dict
-exp
-data
-raw_wav
-tensorboard
-**/*build*
+Thumbs.db

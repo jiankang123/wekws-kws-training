@@ -35,10 +35,21 @@ class Executor:
         min_duration = args.get('min_duration', 0)
 
         for batch_idx, batch_dict in enumerate(data_loader):
+            # 兼容 tuple 格式 (keys, feats, labels, feats_lengths, label_lengths)
+            if isinstance(batch_dict, (list, tuple)):
+                batch_dict = {
+                    'keys': batch_dict[0],
+                    'feats': batch_dict[1],
+                    'target': batch_dict[2],
+                    'feats_lengths': batch_dict[3],
+                    'target_lengths': batch_dict[4],
+                }
             key = batch_dict['keys']
             feats = batch_dict['feats']
             target = batch_dict['target']
-            target = target[:, 0] if target.shape[1] == 1 else target
+            # 兼容 1D target (int label per sample) 和 2D target
+            if target.dim() == 2 and target.shape[1] == 1:
+                target = target[:, 0]
             feats_lengths = batch_dict['feats_lengths']
             label_lengths = batch_dict['target_lengths']
             feats = feats.to(device)
@@ -79,10 +90,21 @@ class Executor:
         total_acc = 0.0
         with torch.no_grad():
             for batch_idx, batch_dict in enumerate(data_loader):
+                # 兼容 tuple 格式 (keys, feats, labels, feats_lengths, label_lengths)
+                if isinstance(batch_dict, (list, tuple)):
+                    batch_dict = {
+                        'keys': batch_dict[0],
+                        'feats': batch_dict[1],
+                        'target': batch_dict[2],
+                        'feats_lengths': batch_dict[3],
+                        'target_lengths': batch_dict[4],
+                    }
                 key = batch_dict['keys']
                 feats = batch_dict['feats']
                 target = batch_dict['target']
-                target = target[:, 0] if target.shape[1] == 1 else target
+                # 兼容 1D target (int label per sample) 和 2D target
+                if target.dim() == 2 and target.shape[1] == 1:
+                    target = target[:, 0]
                 feats_lengths = batch_dict['feats_lengths']
                 label_lengths = batch_dict['target_lengths']
                 feats = feats.to(device)
